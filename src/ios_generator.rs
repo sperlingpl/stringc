@@ -1,5 +1,3 @@
-use crate::translation;
-use crate::translation::Translations;
 use std::fs::File;
 use std::io::{LineWriter, Write};
 use crate::strings_generator::Generator;
