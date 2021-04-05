@@ -4,13 +4,21 @@ use std::process;
 use clap::{App, Arg, ArgMatches};
 use crate::ios_generator::{TranslationsIOS, TranslationOut};
 use crate::strings_generator::Generator;
-use crate::translation::{Project, Translation, Translations};
-use crate::excel_writer::ExcelTranslations;
+use crate::json_data::{Project, Translation, generate_template, get_projects, save};
+use crate::excel_writer::{ExcelTranslations, ExcelTranslation};
+use crate::excel_reader::import_excel;
 
-mod translation;
+mod json_data;
 mod ios_generator;
 mod strings_generator;
 mod excel_writer;
+mod excel_reader;
+
+const COMMAND_GENERATE_TEMPLATE: &str = "generate";
+const COMMAND_IMPORT_XLSX: &str = "import";
+const ARG_FILE_NAME: &str = "file_name";
+const ARG_INPUT_FILE_NAME: &str = "input_file_name";
+const ARG_IMPORT_IGNORE_UNKNOWN_KEYS: &str = "ignore_unknown_keys";
 
 const DATA_FILE_ARG: &str = "data";
 const PROJECT_ARG: &str = "project";
@@ -22,11 +30,21 @@ const OMIT_TRANSLATED_XLSX_ARG: &str = "omit_translated_xlsx";
 
 fn main() {
     let matches = get_arguments();
-    let data_file_name = matches.value_of(DATA_FILE_ARG)
+
+    match matches.subcommand_name() {
+        Some(COMMAND_GENERATE_TEMPLATE) => generate_template_command(&matches),
+        Some(COMMAND_IMPORT_XLSX) => import_xlsx_command(&matches),
+        _ => {
+            println!("error: No command provided");
+            process::exit(1);
+        }
+    }
+
+    /*let data_file_name = matches.value_of(DATA_FILE_ARG)
         .expect("No file provided!");
 
     let data = load_data_file(&String::from(data_file_name));
-    let project_data = translation::get_projects(&data)
+    let project_data = json_data::get_projects(&data)
         .unwrap_or_else(|err| {
             println!("Cannot read project test_data!\nerror: {}", err);
             process::exit(1);
@@ -43,11 +61,15 @@ fn main() {
         .first()
         .expect("Not valid project name!");
 
-    let translations: Vec<&Translations> = project_data.translations.iter()
+    let translations: Vec<&Translation> = project_data.translations.iter()
         .filter(|&translation| {
             translation.projects.contains(&project.id)
         })
         .collect();
+
+    if let Some(input_excel_file) = matches.value_of(IMPORT_XLSX_ARG) {
+        read_excel(input_excel_file);
+    }
 
     if let Some(output_list) = matches.value_of(OUTPUT_ARG) {
         let output_types: Vec<&str> = output_list.split(",").collect();
@@ -65,19 +87,77 @@ fn main() {
 
     if let Some(excel_file_name) = matches.value_of(EXPORT_XLSX_ARG) {
         export_xlsx(project, translations, excel_file_name);
-    }
+    }*/
 }
 
-fn export_xlsx(project: &Project, translations: Vec<&Translations>, file_name: &str) {
-    for translation in translations {
+fn generate_template_command(matches: &ArgMatches) {
+    let file_name = matches.subcommand_matches(COMMAND_GENERATE_TEMPLATE)
+        .unwrap()
+        .value_of(ARG_FILE_NAME)
+        .unwrap();
+    generate_template(file_name);
+}
 
+fn import_xlsx_command(matches: &ArgMatches) {
+    let file_name = matches.subcommand_matches(COMMAND_IMPORT_XLSX)
+        .unwrap()
+        .value_of(ARG_FILE_NAME)
+        .unwrap();
+
+    let xlsx_file_name = matches.subcommand_matches(COMMAND_IMPORT_XLSX)
+        .unwrap()
+        .value_of(ARG_INPUT_FILE_NAME)
+        .unwrap();
+
+    let ignore_unknown = matches.subcommand_matches(COMMAND_IMPORT_XLSX)
+        .unwrap()
+        .is_present(ARG_IMPORT_IGNORE_UNKNOWN_KEYS);
+
+    let data = load_data_file(file_name);
+    let mut projects_data = get_projects(&data)
+        .unwrap_or_else(|err| {
+            println!("Cannot open data file!\nerror: {}", err);
+            process::exit(1)
+        });
+
+    import_excel(xlsx_file_name, &mut projects_data, 1, ignore_unknown);
+    save(file_name, &projects_data);
+}
+
+/*fn export_xlsx(project: &Project, translations: Vec<&Translation>, file_name: &str) {
+    let mut out_translations: Vec<ExcelTranslation> = vec![];
+
+    for translation in translations {
+        let translation_values: Vec<&TranslationValue> = translation.values.iter()
+            .filter(|&translation| {
+                translation.project.eq(&project.id)
+            })
+            .collect();
+
+        let mut lang_values: Vec<String> = vec![];
+
+        for lang in &project.langs {
+            let value = translation_values.iter()
+                .find(|&&item| item.lang.eq(lang));
+
+            match value {
+                Some(&val) => {
+                    lang_values.push(val.value.to_string());
+                },
+                _ => {
+                    lang_values.push("".to_string());
+                }
+            }
+        }
+
+        // out_translations.push(ExcelTranslation::new(translation.key.to_string(), lang_values));
     }
 
-    let excel_translations = ExcelTranslations::new(project.langs.clone(), vec![]);
+    let excel_translations = ExcelTranslations::new(project.langs.clone(), out_translations);
     excel_translations.generate(file_name);
 }
-
-fn generate_ios_strings(project: &Project, translations: &Vec<&Translations>) {
+*/
+/*fn generate_ios_strings(project: &Project, translations: &Vec<&Translation>) {
     for lang in &project.langs.clone() {
         let mut out_translations: Vec<TranslationOut> = vec![];
 
@@ -86,7 +166,7 @@ fn generate_ios_strings(project: &Project, translations: &Vec<&Translations>) {
                 .filter(|&values| {
                     values.lang.eq(lang)
                 })
-                .collect::<Vec<&Translation>>();
+                .collect::<Vec<&TranslationValue>>();
 
             let first_value = value.first();
 
@@ -105,60 +185,88 @@ fn generate_ios_strings(project: &Project, translations: &Vec<&Translations>) {
         let trans_ios = TranslationsIOS { lang: lang.to_string(), translations: out_translations };
         trans_ios.generate();
     }
-}
+}*/
 
 fn get_arguments() -> ArgMatches {
     let matches = App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .about("Simple strings generator and manager.")
-        .arg(Arg::new(DATA_FILE_ARG)
-            .required(true)
-            .takes_value(false)
+        .subcommand(App::new(COMMAND_GENERATE_TEMPLATE)
+            .about("Generates project template")
+            .arg(Arg::new(ARG_FILE_NAME)
+                .required(true)
+                .takes_value(false)
+                .about("Data file name")
+            )
         )
-        .arg(Arg::new(PROJECT_ARG)
-            .short('p')
-            .long("project")
-            .about("Selects project to work on")
-            .takes_value(true)
-            .required(true)
+        .subcommand(App::new(COMMAND_IMPORT_XLSX)
+            .about("Imports data from xlsx file")
+            .arg(Arg::new(ARG_FILE_NAME)
+                .required(true)
+                .takes_value(false)
+                .about("Data file name")
+            )
+            .arg(Arg::new(ARG_INPUT_FILE_NAME)
+                .required(true)
+                .takes_value(false)
+                .about("File to import")
+            )
+            .arg(Arg::new(ARG_IMPORT_IGNORE_UNKNOWN_KEYS)
+                .required(false)
+                .takes_value(false)
+                .about("Ignores unknown keys, will not add them to data file")
+                .short('i')
+                .long("ignore-unknown")
+            )
         )
-        .arg(Arg::new(OUTPUT_ARG)
-            .short('o')
-            .long("out")
-            .about("Comma separated strings output for iOS and/or Android targets.")
-            .possible_values(["and", "ios", "and,ios"].as_ref())
-            .takes_value(true)
-        )
-        .arg(Arg::new(VERBOSE_ARG)
-            .short('v')
-            .long("verbose")
-            .about("Verbose mode")
-            .takes_value(false)
-        )
-        .arg(Arg::new(OMIT_TRANSLATED_XLSX_ARG)
-            .short('g')
-            .long("ignore-translated")
-            .about("Omit translated strings when exporting to Excel.")
-            .takes_value(false)
-        )
-        .arg(Arg::new(EXPORT_XLSX_ARG)
-            .short('e')
-            .long("export-xlsx")
-            .about("Exports strings to Excel (xlsx) file with given file name.")
-            .takes_value(true)
-        )
-        .arg(Arg::new(IMPORT_XLSX_ARG)
-            .short('i')
-            .long("import-xlsx")
-            .about("Import Excel (xlsx) file with given name.")
-            .takes_value(true)
-        )
+        // .arg(Arg::new(DATA_FILE_ARG)
+        //     .required(true)
+        //     .takes_value(false)
+        // )
+        // .arg(Arg::new(PROJECT_ARG)
+        //     .short('p')
+        //     .long("project")
+        //     .about("Selects project to work on")
+        //     .takes_value(true)
+        //     .required(true)
+        // )
+        // .arg(Arg::new(OUTPUT_ARG)
+        //     .short('o')
+        //     .long("out")
+        //     .about("Comma separated strings output for iOS and/or Android targets.")
+        //     .possible_values(["and", "ios", "and,ios"].as_ref())
+        //     .takes_value(true)
+        // )
+        // .arg(Arg::new(VERBOSE_ARG)
+        //     .short('v')
+        //     .long("verbose")
+        //     .about("Verbose mode")
+        //     .takes_value(false)
+        // )
+        // .arg(Arg::new(OMIT_TRANSLATED_XLSX_ARG)
+        //     .short('g')
+        //     .long("ignore-translated")
+        //     .about("Omit translated strings when exporting to Excel.")
+        //     .takes_value(false)
+        // )
+        // .arg(Arg::new(EXPORT_XLSX_ARG)
+        //     .short('e')
+        //     .long("export-xlsx")
+        //     .about("Exports strings to Excel (xlsx) file with given file name.")
+        //     .takes_value(true)
+        // )
+        // .arg(Arg::new(IMPORT_XLSX_ARG)
+        //     .short('i')
+        //     .long("import-xlsx")
+        //     .about("Import Excel (xlsx) file with given name.")
+        //     .takes_value(true)
+        // )
         .get_matches();
     matches
 }
 
-fn load_data_file(name: &String) -> String {
+fn load_data_file(name: &str) -> String {
     let string_data = fs::read_to_string(name)
         .unwrap_or_else(|err| {
             println!("Cannot open file \"{}\"\nerror: {}",  name, err);
