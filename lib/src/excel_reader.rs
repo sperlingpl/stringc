@@ -66,3 +66,13 @@ fn add_new_key(data_root: &mut DataRoot, project_id: u16, key: String, lang: &St
     let value_node = Translation { projects: vec![1], values: values_map };
     data_root.translations.insert(key.to_string(), value_node);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_import_data() {
+        assert_eq!(1, 1);
+    }
+}

@@ -1,19 +1,17 @@
+use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::process;
-use clap::{App, Arg, ArgMatches};
-use crate::ios_generator::{TranslationsIOS, TranslationOut};
-use crate::strings_generator::Generator;
-use crate::json_data::{Project, Translation, generate_template, get_projects, save, DataRoot};
-use crate::excel_writer::{ExcelTranslations, ExcelTranslation};
-use crate::excel_reader::import_excel;
-use std::collections::BTreeMap;
 
-mod json_data;
-mod ios_generator;
-mod strings_generator;
-mod excel_writer;
-mod excel_reader;
+use clap::{App, Arg, ArgMatches};
+
+use lib::json_data::{DataRoot, generate_template, get_projects, Project, save, Translation};
+
+use lib::excel_reader::import_excel;
+use lib::excel_writer::{ExcelTranslation, ExcelTranslations};
+use lib::ios_generator::{TranslationOut, TranslationsIOS};
+use lib::strings_generator::Generator;
+
 
 const COMMAND_GENERATE_TEMPLATE: &str = "generate";
 const COMMAND_IMPORT_XLSX: &str = "import";

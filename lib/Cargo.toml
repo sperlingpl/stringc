@@ -1,11 +1,17 @@
 [package]
-name = "stringc"
+name = "lib"
 version = "0.1.0"
 authors = ["Paweł Wróblewski"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+name = "lib"
+path = "src/lib.rs"
+
 [dependencies]
-lib = { path = "lib" }
-clap = "3.0.0-beta.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+simple_excel_writer="0.1.4"
+calamine = "0.18.0"

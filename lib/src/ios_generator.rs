@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::{LineWriter, Write};
-use crate::strings_generator::Generator;
+use super::strings_generator::Generator;
 
 pub struct TranslationsIOS {
     pub lang: String,
@@ -8,8 +8,8 @@ pub struct TranslationsIOS {
 }
 
 pub struct TranslationOut {
-    pub(crate) key: String,
-    pub(crate) value: String
+    pub key: String,
+    pub value: String
 }
 
 impl Generator for TranslationsIOS {
