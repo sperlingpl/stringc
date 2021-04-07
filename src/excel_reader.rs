@@ -1,8 +1,6 @@
 use calamine::{Xlsx, Reader};
 use crate::json_data::{DataRoot, Translation};
 use std::collections::BTreeMap;
-use std::arch::x86_64::_mm_extract_si64;
-use std::borrow::BorrowMut;
 
 pub fn import_excel(file: &str, data_root: &mut DataRoot, project_id: u16, ignore_unknown: bool) {
     let mut workbook: Xlsx<_> = calamine::open_workbook(file)
@@ -41,7 +39,7 @@ pub fn import_excel(file: &str, data_root: &mut DataRoot, project_id: u16, ignor
 }
 
 fn update_key_value(data_root: &mut DataRoot, project_id: u16, key: &String, lang: &String, value: &String) {
-    let mut translation_data = data_root.translations.get_mut(key)
+    let translation_data = data_root.translations.get_mut(key)
         .unwrap();
 
     if !translation_data.projects.contains(&project_id) {

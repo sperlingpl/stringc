@@ -4,9 +4,10 @@ use std::process;
 use clap::{App, Arg, ArgMatches};
 use crate::ios_generator::{TranslationsIOS, TranslationOut};
 use crate::strings_generator::Generator;
-use crate::json_data::{Project, Translation, generate_template, get_projects, save};
+use crate::json_data::{Project, Translation, generate_template, get_projects, save, DataRoot};
 use crate::excel_writer::{ExcelTranslations, ExcelTranslation};
 use crate::excel_reader::import_excel;
+use std::collections::BTreeMap;
 
 mod json_data;
 mod ios_generator;
@@ -16,17 +17,12 @@ mod excel_reader;
 
 const COMMAND_GENERATE_TEMPLATE: &str = "generate";
 const COMMAND_IMPORT_XLSX: &str = "import";
+const COMMAND_EXPORT_XLSX: &str = "export-xlsx";
 const ARG_FILE_NAME: &str = "file_name";
 const ARG_INPUT_FILE_NAME: &str = "input_file_name";
 const ARG_IMPORT_IGNORE_UNKNOWN_KEYS: &str = "ignore_unknown_keys";
-
-const DATA_FILE_ARG: &str = "data";
-const PROJECT_ARG: &str = "project";
-const OUTPUT_ARG: &str = "output";
-const VERBOSE_ARG: &str = "verbose";
-const EXPORT_XLSX_ARG: &str = "export_xlsx";
-const IMPORT_XLSX_ARG: &str = "import_xlsx";
-const OMIT_TRANSLATED_XLSX_ARG: &str = "omit_translated_xlsx";
+const ARG_OUTPUT_FILE_NAME: &str = "export_file_name";
+const ARG_PROJECT_NAME: &str = "project_name";
 
 fn main() {
     let matches = get_arguments();
@@ -34,6 +30,7 @@ fn main() {
     match matches.subcommand_name() {
         Some(COMMAND_GENERATE_TEMPLATE) => generate_template_command(&matches),
         Some(COMMAND_IMPORT_XLSX) => import_xlsx_command(&matches),
+        Some(COMMAND_EXPORT_XLSX) => export_xlsx_command(&matches),
         _ => {
             println!("error: No command provided");
             process::exit(1);
@@ -95,7 +92,11 @@ fn generate_template_command(matches: &ArgMatches) {
         .unwrap()
         .value_of(ARG_FILE_NAME)
         .unwrap();
-    generate_template(file_name);
+
+    if let Err(e) = generate_template(file_name) {
+        println!("error: {}", e);
+        process::exit(1)
+    };
 }
 
 fn import_xlsx_command(matches: &ArgMatches) {
@@ -113,15 +114,51 @@ fn import_xlsx_command(matches: &ArgMatches) {
         .unwrap()
         .is_present(ARG_IMPORT_IGNORE_UNKNOWN_KEYS);
 
-    let data = load_data_file(file_name);
-    let mut projects_data = get_projects(&data)
-        .unwrap_or_else(|err| {
-            println!("Cannot open data file!\nerror: {}", err);
-            process::exit(1)
-        });
+    let mut projects_data = get_data(file_name);
 
     import_excel(xlsx_file_name, &mut projects_data, 1, ignore_unknown);
-    save(file_name, &projects_data);
+    if let Err(e) = save(file_name, &projects_data) {
+        println!("error: {}", e);
+        process::exit(1)
+    };
+}
+
+fn export_xlsx_command(matches: &ArgMatches) {
+    let command = matches.subcommand_matches(COMMAND_EXPORT_XLSX)
+        .unwrap();
+
+    let file_name = command
+        .value_of(ARG_FILE_NAME)
+        .unwrap();
+
+    let xlsx_file_name = command
+        .value_of(ARG_OUTPUT_FILE_NAME)
+        .unwrap();
+
+    let project_name = command
+        .value_of(ARG_PROJECT_NAME)
+        .unwrap();
+
+    let data = get_data(file_name);
+
+    let project = data.projects.iter().find(|&p| {
+        p.name.eq(project_name)
+    }).expect("Invalid project name");
+
+    let da: BTreeMap<_, _> = data.translations.into_iter()
+        .filter(|(_, t)| t.projects.contains(&project.id))
+        .collect();
+
+    for (key, value) in da {
+        if let Some(asd) = value.values.get(&project.id) {
+            for lang in project.langs.to_vec() {
+
+            }
+        }
+    }
+
+    let excel_translations = ExcelTranslations::new(project.langs.to_vec(), vec![]);
+    excel_translations.generate(xlsx_file_name);
 }
 
 /*fn export_xlsx(project: &Project, translations: Vec<&Translation>, file_name: &str) {
@@ -220,6 +257,24 @@ fn get_arguments() -> ArgMatches {
                 .long("ignore-unknown")
             )
         )
+        .subcommand(App::new(COMMAND_EXPORT_XLSX)
+            .about("Exports data to xlsx file")
+            .arg(Arg::new(ARG_FILE_NAME)
+                .required(true)
+                .takes_value(false)
+                .about("Data file name")
+            )
+            .arg(Arg::new(ARG_OUTPUT_FILE_NAME)
+                .required(true)
+                .takes_value(false)
+                .about("File name to export xlsx")
+            )
+            .arg(Arg::new(ARG_PROJECT_NAME)
+                .required(true)
+                .takes_value(false)
+                .about("Project to export")
+            )
+        )
         // .arg(Arg::new(DATA_FILE_ARG)
         //     .required(true)
         //     .takes_value(false)
@@ -264,6 +319,16 @@ fn get_arguments() -> ArgMatches {
         // )
         .get_matches();
     matches
+}
+
+fn get_data(file_name: &str) -> DataRoot {
+    let data = load_data_file(file_name);
+    let projects_data = get_projects(&data)
+        .unwrap_or_else(|err| {
+            println!("Cannot open data file!\nerror: {}", err);
+            process::exit(1)
+        });
+    projects_data
 }
 
 fn load_data_file(name: &str) -> String {

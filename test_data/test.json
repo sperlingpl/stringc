@@ -2,43 +2,25 @@
   "projects": [
     {
       "id": 1,
-      "name": "proj1",
-      "langs": ["en", "pl"],
-      "defaultLang": "en"
+      "name": "TestProject",
+      "langs": [
+        "en-US",
+        "pl-PL"
+      ],
+      "defaultLang": "en-US"
     }
   ],
-  "translations": [
-    {
-      "key": "app.title",
-      "projects": [1],
-      "values": [
-        {
-          "value": "Hello world",
-          "lang": "en",
-          "project": 1
-        },
-        {
-          "value": "Witaj \"świecie\"",
-          "lang": "pl",
-          "project": 1
+  "translations": {
+    "app.title": {
+      "projects": [
+        1
+      ],
+      "values": {
+        "1": {
+          "en-US": "Hello World!",
+          "pl-PL": "Witaj świecie!"
         }
-      ]
-    },
-    {
-      "key": "second",
-      "projects": [1],
-      "values": [
-        {
-          "value": "takie tam %d number",
-          "lang": "en",
-          "project": 1
-        },
-        {
-          "value": "drugi string %s z czyms",
-          "lang": "pl",
-          "project": 1
-        }
-      ]
+      }
     }
-  ]
+  }
 }
