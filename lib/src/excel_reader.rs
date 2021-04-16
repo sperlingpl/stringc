@@ -1,15 +1,52 @@
-use calamine::{Xlsx, Reader};
-use crate::json_data::{DataRoot, Translation};
 use std::collections::BTreeMap;
-use crate::excel_file::EFile;
+use std::error::Error;
+use std::fmt;
 
-pub fn imp_excel(file: &EFile, data_root: &mut DataRoot, project_id: u16, ignore_unknown: bool) {
-    let mut lang_list: Vec<String> = vec![];
+use calamine::{Reader, Xlsx};
+
+use crate::excel_file::EFile;
+use crate::json_data::{DataRoot, Translation, Project, DataRootTranslations};
+use std::panic::resume_unwind;
+
+pub struct ImportResult {
+    pub added: Vec<String>,
+    pub updated: Vec<String>,
+    pub ignored: Vec<String>
+}
+
+#[derive(Debug, Clone)]
+pub struct InvalidLanguageError;
+
+impl fmt::Display for InvalidLanguageError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "invalid language in file")
+    }
+}
+
+impl Error for InvalidLanguageError {}
+
+struct Lang {
+    name: String,
+    column: u16
+}
+
+type Result<T> = std::result::Result<T, InvalidLanguageError>;
+
+pub fn imp_excel(file: &dyn EFile, data_root: &mut DataRootTranslations, project: &Project, ignore_unknown: bool)
+    -> Result<ImportResult> {
+    let mut lang_list: Vec<Lang> = vec![];
+    let mut result = ImportResult { added: vec![], updated: vec![], ignored: vec![] };
 
     for (idx, row) in file.rows().into_iter().enumerate() {
         if 0.eq(&idx) {
             for column in 1..row.len() {
-                lang_list.push(row[column].to_string());
+                let lang = Lang { name: row[column].to_string(), column: column as u16 };
+
+                if project.langs.contains(&lang.name) {
+                    lang_list.push(lang);
+                } else if !ignore_unknown {
+                    return Err(InvalidLanguageError);
+                }
             }
             continue;
         }
@@ -22,53 +59,68 @@ pub fn imp_excel(file: &EFile, data_root: &mut DataRoot, project_id: u16, ignore
         for (idx, lang) in lang_list.iter().enumerate() {
             let value = row[idx + 1].to_string();
 
-            if data_root.translations.contains_key(&key) {
-                update_key_value(data_root, project_id, &key, lang, &value);
+            if data_root.contains_key(&key) {
+                update_key_value(data_root, project.id, &key, &lang.name, &value);
+
+                if !result.added.contains(&key) && !result.updated.contains(&key) {
+                    result.updated.push(key.to_string());
+                }
             } else if !ignore_unknown {
-                add_new_key(data_root, project_id, key.to_string(), lang, value);
-            } else { }
-        }
-    }
-}
-
-pub fn import_excel(file: &str, data_root: &mut DataRoot, project_id: u16, ignore_unknown: bool) {
-    let mut workbook: Xlsx<_> = calamine::open_workbook(file)
-        .expect("Cannot open file");
-
-    let worksheet = workbook.worksheets()
-        .first()
-        .expect("Cannot read sheet")
-        .clone();
-
-    let mut lang_list: Vec<String> = vec![];
-
-    for (idx, row) in worksheet.1.rows().into_iter().enumerate() {
-        if 0.eq(&idx) {
-            for column in 1..row.len() {
-                lang_list.push(row[column].to_string());
+                add_new_key(data_root, project.id, key.to_string(), &lang.name, value);
+                add_result(key.to_string(), &mut result.added);
+            } else {
+                add_result(key.to_string(), &mut result.ignored);
             }
-            continue;
-        }
-
-        let key = row[0].to_string();
-        if key.is_empty() {
-            continue;
-        }
-
-        for (idx, lang) in lang_list.iter().enumerate() {
-            let value = row[idx + 1].to_string();
-
-            if data_root.translations.contains_key(&key) {
-                update_key_value(data_root, project_id, &key, lang, &value);
-            } else if !ignore_unknown {
-                add_new_key(data_root, project_id, key.to_string(), lang, value);
-            } else { }
         }
     }
+
+    Ok(result)
 }
 
-fn update_key_value(data_root: &mut DataRoot, project_id: u16, key: &String, lang: &String, value: &String) {
-    let translation_data = data_root.translations.get_mut(key)
+fn add_result(key: String, list: &mut Vec<String>) {
+    if !list.contains(&key) {
+        list.push(key);
+    }
+}
+//
+// pub fn import_excel(file: &str, data_root: &mut DataRoot, project_id: u16, ignore_unknown: bool) {
+//     let mut workbook: Xlsx<_> = calamine::open_workbook(file)
+//         .expect("Cannot open file");
+//
+//     let worksheet = workbook.worksheets()
+//         .first()
+//         .expect("Cannot read sheet")
+//         .clone();
+//
+//     let mut lang_list: Vec<String> = vec![];
+//
+//     for (idx, row) in worksheet.1.rows().into_iter().enumerate() {
+//         if 0.eq(&idx) {
+//             for column in 1..row.len() {
+//                 lang_list.push(row[column].to_string());
+//             }
+//             continue;
+//         }
+//
+//         let key = row[0].to_string();
+//         if key.is_empty() {
+//             continue;
+//         }
+//
+//         for (idx, lang) in lang_list.iter().enumerate() {
+//             let value = row[idx + 1].to_string();
+//
+//             if data_root.translations.contains_key(&key) {
+//                 update_key_value(data_root, project_id, &key, lang, &value);
+//             } else if !ignore_unknown {
+//                 add_new_key(data_root, project_id, key.to_string(), lang, value);
+//             } else {}
+//         }
+//     }
+// }
+
+fn update_key_value(data_root: &mut DataRootTranslations, project_id: u16, key: &String, lang: &String, value: &String) {
+    let translation_data = data_root.get_mut(key)
         .unwrap();
 
     if !translation_data.projects.contains(&project_id) {
@@ -83,7 +135,7 @@ fn update_key_value(data_root: &mut DataRoot, project_id: u16, key: &String, lan
         .insert(lang.to_string(), value.to_string());
 }
 
-fn add_new_key(data_root: &mut DataRoot, project_id: u16, key: String, lang: &String, value: String) {
+fn add_new_key(data_root: &mut DataRootTranslations, project_id: u16, key: String, lang: &String, value: String) {
     println!("Adding new key: {}", key);
 
     let mut values_lang_map = BTreeMap::new();
@@ -93,35 +145,5 @@ fn add_new_key(data_root: &mut DataRoot, project_id: u16, key: String, lang: &St
     values_map.insert(project_id, values_lang_map);
 
     let value_node = Translation { projects: vec![1], values: values_map };
-    data_root.translations.insert(key.to_string(), value_node);
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_add_key() {
-        let mut data_root = generate_basic_data();
-
-        add_new_key(&mut data_root, 1, "t2".to_string(), &"en".to_string(), "test1".to_string());
-
-        assert_eq!(2, data_root.translations.len());
-        assert_eq!(true, data_root.translations.contains_key("t2"));
-    }
-
-    fn generate_basic_data() -> DataRoot {
-        let mut value_map = BTreeMap::new();
-        value_map.insert("en".to_string(), "Hello".to_string());
-
-        let mut values_map = BTreeMap::new();
-        values_map.insert(1, value_map);
-
-        let mut translation_map = BTreeMap::new();
-        let translation = Translation { projects: vec![1], values: values_map };
-        translation_map.insert("t1".to_string(), translation);
-
-        let mut data_root = DataRoot { projects: vec![], translations: translation_map };
-        data_root
-    }
+    data_root.insert(key.to_string(), value_node);
 }

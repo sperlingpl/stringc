@@ -7,7 +7,6 @@ use clap::{App, Arg, ArgMatches};
 
 use lib::json_data::{DataRoot, generate_template, get_projects, Project, save, Translation};
 
-use lib::excel_reader::import_excel;
 use lib::excel_writer::{ExcelTranslation, ExcelTranslations};
 use lib::ios_generator::{TranslationOut, TranslationsIOS};
 use lib::strings_generator::Generator;
@@ -114,11 +113,11 @@ fn import_xlsx_command(matches: &ArgMatches) {
 
     let mut projects_data = get_data(file_name);
 
-    import_excel(xlsx_file_name, &mut projects_data, 1, ignore_unknown);
-    if let Err(e) = save(file_name, &projects_data) {
-        println!("error: {}", e);
-        process::exit(1)
-    };
+    // import_excel(xlsx_file_name, &mut projects_data, 1, ignore_unknown);
+    // if let Err(e) = save(file_name, &projects_data) {
+    //     println!("error: {}", e);
+    //     process::exit(1)
+    // };
 }
 
 fn export_xlsx_command(matches: &ArgMatches) {

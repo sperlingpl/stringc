@@ -4,6 +4,8 @@ use std::fs::File;
 use std::io::{LineWriter, Write};
 use std::collections::BTreeMap;
 
+pub type DataRootTranslations = BTreeMap<String, Translation>;
+
 #[derive(Serialize, Deserialize)]
 pub struct DataRoot {
     pub projects: Vec<Project>,

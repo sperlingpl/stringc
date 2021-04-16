@@ -1,16 +1,18 @@
-use lib::excel_file::{ExcelFile, EFile};
-use lib::json_data::{DataRoot, Translation, Project, get_projects};
 use std::collections::BTreeMap;
-use lib::excel_reader::imp_excel;
+
+use lib::excel_file::{EFile, ExcelFile};
+use lib::excel_reader::{imp_excel, InvalidLanguageError};
+use lib::json_data::{DataRoot, get_projects, Project, Translation};
+use std::panic::resume_unwind;
 
 struct ExcelFileMock {
     columns: Vec<String>,
-    rows: Vec<Vec<String>>
+    rows: Vec<Vec<String>>,
 }
 
 impl EFile for ExcelFileMock {
     fn rows(&self) -> Vec<Vec<String>> {
-       self.rows.clone()
+        self.rows.clone()
     }
 
     fn columns(&self) -> Vec<String> {
@@ -20,32 +22,41 @@ impl EFile for ExcelFileMock {
 
 #[test]
 fn import_excel_wrong_language_project1_file() {
-    let file = ExcelFileMock { rows: vec![
-        vec!["key".to_string(), "en-US".to_string(), "de-DE".to_string()],
-        vec!["new1".to_string(), "added1-en".to_string(), "added1-de".to_string()],
-        vec!["app.t2".to_string(), "updated1-en".to_string(), "updated1-de".to_string()]
-    ], columns: vec![] };
+    let file = ExcelFileMock {
+        rows: vec![
+            vec!["key".to_string(), "en-US".to_string(), "de-DE".to_string()],
+            vec!["new1".to_string(), "added1-en".to_string(), "added1-de".to_string()],
+            vec!["app.t2".to_string(), "updated1-en".to_string(), "updated1-de".to_string()]
+        ],
+        columns: vec![],
+    };
+
     let mut data_root = generate_basic_data();
+    let project = &data_root.projects[0];
+    let result = imp_excel(&file, &mut data_root.translations, project, false);
 
-    imp_excel(&file, &mut data_root, 1, false);
-
-    assert_eq!(2, data_root.projects.len());
-    assert_eq!(4, data_root.translations.len());
-    assert_eq!(false, data_root.translations.contains_key("new1"));
-    assert_eq!(false, data_root.translations.contains_key("app.t2"));
+    assert_eq!(result.is_err(), true);
 }
 
 #[test]
 fn import_excel_project2_file() {
-    let file = ExcelFileMock { rows: vec![
-        vec!["key".to_string(), "en-US".to_string(), "de-DE".to_string()],
-        vec!["new1".to_string(), "added1-en".to_string(), "added1-de".to_string()],
-        vec!["app.t2".to_string(), "updated1-en".to_string(), "updated1-de".to_string()]
-    ], columns: vec![] };
+    let file = ExcelFileMock {
+        rows: vec![
+            vec!["key".to_string(), "en-US".to_string(), "de-DE".to_string()],
+            vec!["new1".to_string(), "added1-en".to_string(), "added1-de".to_string()],
+            vec!["app.t2".to_string(), "updated1-en".to_string(), "updated1-de".to_string()]
+        ],
+        columns: vec![],
+    };
+
     let mut data_root = generate_basic_data();
+    let result = imp_excel(&file, &mut data_root.translations, &data_root.projects[1], false);
 
-    imp_excel(&file, &mut data_root, 2, false);
-
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(1, result.added.len());
+    assert_eq!(1, result.updated.len());
+    assert_eq!(0, result.ignored.len());
     assert_eq!(2, data_root.projects.len());
     assert_eq!(5, data_root.translations.len());
     assert_eq!(true, data_root.translations.contains_key("new1"));
@@ -59,8 +70,13 @@ fn import_empty_excel_file() {
     let file = ExcelFileMock { rows: vec![], columns: vec![] };
     let mut data_root = generate_basic_data();
 
-    imp_excel(&file, &mut data_root, 1, false);
+    let result = imp_excel(&file, &mut data_root.translations, &data_root.projects[0], false);
 
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(0, result.added.len());
+    assert_eq!(0, result.updated.len());
+    assert_eq!(0, result.ignored.len());
     assert_eq!(2, data_root.projects.len());
     assert_eq!(4, data_root.translations.len());
     assert_eq!("Hello", data_root.translations.get("app.hello").unwrap().values.get(&1).unwrap().get("en-US").unwrap())
@@ -68,15 +84,23 @@ fn import_empty_excel_file() {
 
 #[test]
 fn import_ignore_unknown_excel_file() {
-    let file = ExcelFileMock { rows: vec![
-        vec!["key".to_string(), "en-US".to_string(), "de-DE".to_string()],
-        vec!["new1".to_string(), "added1-en".to_string(), "added1-de".to_string()],
-        vec!["app.t2".to_string(), "updated1-en".to_string(), "updated1-de".to_string()]
-    ], columns: vec![] };
+    let file = ExcelFileMock {
+        rows: vec![
+            vec!["key".to_string(), "en-US".to_string(), "de-DE".to_string()],
+            vec!["new1".to_string(), "added1-en".to_string(), "added1-de".to_string()],
+            vec!["app.t2".to_string(), "updated1-en".to_string(), "updated1-de".to_string()]
+        ],
+        columns: vec![],
+    };
     let mut data_root = generate_basic_data();
 
-    imp_excel(&file, &mut data_root, 2, true);
+    let result = imp_excel(&file, &mut data_root.translations, &data_root.projects[1], true);
 
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(0, result.added.len());
+    assert_eq!(1, result.updated.len());
+    assert_eq!(1, result.ignored.len());
     assert_eq!(2, data_root.projects.len());
     assert_eq!(4, data_root.translations.len());
     assert_eq!(false, data_root.translations.contains_key("new1"));
