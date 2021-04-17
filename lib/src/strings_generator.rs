@@ -19,7 +19,7 @@ pub struct TranslationOut {
 
 pub fn generate_strings(export_type: StringsGeneratorType, data: &DataRootTranslations, project: &Project) {
     for lang in &project.langs {
-        let strings = prepare_strings(export_type.clone(), &data, &project.id, lang.to_string());
+        let strings = prepare_strings(&data, &project.id, lang.to_string());
 
         match export_type {
             StringsGeneratorType::Ios => {
@@ -31,8 +31,7 @@ pub fn generate_strings(export_type: StringsGeneratorType, data: &DataRootTransl
     }
 }
 
-fn prepare_strings(export_type: StringsGeneratorType, data: &DataRootTranslations, project_id: &u16, lang: String)
-    -> Vec<TranslationOut> {
+fn prepare_strings(data: &DataRootTranslations, project_id: &u16, lang: String) -> Vec<TranslationOut> {
     let mut translations: Vec<TranslationOut> = vec![];
 
     let items: BTreeMap<_, _> = data.iter()
@@ -64,7 +63,7 @@ mod tests {
     #[test]
     fn export_ios() {
         let data = generate_basic_data();
-        let strings = prepare_strings(Ios, &data.translations, &data.projects[0].id, "en-US".to_string());
+        let strings = prepare_strings(&data.translations, &data.projects[0].id, "en-US".to_string());
 
         assert_eq!(strings.len(), 3);
         assert_eq!(strings[0].key, "app.hello");

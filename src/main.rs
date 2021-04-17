@@ -8,7 +8,7 @@ use clap::{App, Arg, ArgMatches};
 use lib::json_data::{DataRoot, generate_template, get_projects, save};
 
 use lib::excel_writer::{ExcelTranslations};
-use lib::strings_generator::{Generator, generate_strings};
+use lib::strings_generator::{generate_strings};
 use lib::excel_file::ExcelFile;
 use lib::excel_reader::import_excel;
 use lib::strings_generator::StringsGeneratorType::{Ios, Android};
