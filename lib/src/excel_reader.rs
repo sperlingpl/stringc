@@ -23,8 +23,7 @@ impl fmt::Display for InvalidLanguageError {
 impl Error for InvalidLanguageError {}
 
 struct Lang {
-    name: String,
-    column: u16
+    name: String
 }
 
 type Result<T> = std::result::Result<T, InvalidLanguageError>;
@@ -37,7 +36,7 @@ pub fn import_excel(file: &mut dyn EFile, data_root: &mut DataRootTranslations, 
     for (idx, row) in file.rows().into_iter().enumerate() {
         if 0.eq(&idx) {
             for column in 1..row.len() {
-                let lang = Lang { name: row[column].to_string(), column: column as u16 };
+                let lang = Lang { name: row[column].to_string() };
 
                 if project.langs.contains(&lang.name) {
                     lang_list.push(lang);

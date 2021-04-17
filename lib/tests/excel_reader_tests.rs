@@ -108,6 +108,33 @@ fn import_ignore_unknown_excel_file() {
     assert_eq!("updated1-de", data_root.translations.get("app.t2").unwrap().values.get(&2).unwrap().get("de-DE").unwrap());
 }
 
+#[test]
+fn import_excel_inverted_languages_file() {
+    let mut file = ExcelFileMock {
+        rows: vec![
+            vec!["key".to_string(), "de-DE".to_string(), "en-US".to_string()],
+            vec!["new1".to_string(), "added1-de".to_string(), "added1-en".to_string()],
+            vec!["app.t2".to_string(), "updated1-de".to_string(), "updated1-en".to_string()]
+        ],
+        columns: vec![],
+    };
+
+    let mut data_root = generate_basic_data();
+    let result = import_excel(&mut file, &mut data_root.translations, &data_root.projects[1], false);
+
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(1, result.added.len());
+    assert_eq!(1, result.updated.len());
+    assert_eq!(0, result.ignored.len());
+    assert_eq!(2, data_root.projects.len());
+    assert_eq!(5, data_root.translations.len());
+    assert_eq!(true, data_root.translations.contains_key("new1"));
+    assert_eq!(true, data_root.translations.contains_key("app.t2"));
+    assert_eq!("added1-en", data_root.translations.get("new1").unwrap().values.get(&2).unwrap().get("en-US").unwrap());
+    assert_eq!("updated1-de", data_root.translations.get("app.t2").unwrap().values.get(&2).unwrap().get("de-DE").unwrap());
+}
+
 fn generate_basic_data() -> DataRoot {
     let json = r#"
     {
