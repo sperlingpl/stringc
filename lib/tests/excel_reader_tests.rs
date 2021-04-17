@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use lib::excel_file::{EFile, ExcelFile};
-use lib::excel_reader::{imp_excel, InvalidLanguageError};
+use lib::excel_reader::{import_excel, InvalidLanguageError};
 use lib::json_data::{DataRoot, get_projects, Project, Translation};
 use std::panic::resume_unwind;
 
@@ -11,7 +11,7 @@ struct ExcelFileMock {
 }
 
 impl EFile for ExcelFileMock {
-    fn rows(&self) -> Vec<Vec<String>> {
+    fn rows(&mut self) -> Vec<Vec<String>> {
         self.rows.clone()
     }
 
@@ -22,7 +22,7 @@ impl EFile for ExcelFileMock {
 
 #[test]
 fn import_excel_wrong_language_project1_file() {
-    let file = ExcelFileMock {
+    let mut file = ExcelFileMock {
         rows: vec![
             vec!["key".to_string(), "en-US".to_string(), "de-DE".to_string()],
             vec!["new1".to_string(), "added1-en".to_string(), "added1-de".to_string()],
@@ -33,14 +33,14 @@ fn import_excel_wrong_language_project1_file() {
 
     let mut data_root = generate_basic_data();
     let project = &data_root.projects[0];
-    let result = imp_excel(&file, &mut data_root.translations, project, false);
+    let result = import_excel(&mut file, &mut data_root.translations, project, false);
 
     assert_eq!(result.is_err(), true);
 }
 
 #[test]
 fn import_excel_project2_file() {
-    let file = ExcelFileMock {
+    let mut file = ExcelFileMock {
         rows: vec![
             vec!["key".to_string(), "en-US".to_string(), "de-DE".to_string()],
             vec!["new1".to_string(), "added1-en".to_string(), "added1-de".to_string()],
@@ -50,7 +50,7 @@ fn import_excel_project2_file() {
     };
 
     let mut data_root = generate_basic_data();
-    let result = imp_excel(&file, &mut data_root.translations, &data_root.projects[1], false);
+    let result = import_excel(&mut file, &mut data_root.translations, &data_root.projects[1], false);
 
     assert!(result.is_ok());
     let result = result.unwrap();
@@ -67,10 +67,10 @@ fn import_excel_project2_file() {
 
 #[test]
 fn import_empty_excel_file() {
-    let file = ExcelFileMock { rows: vec![], columns: vec![] };
+    let mut file = ExcelFileMock { rows: vec![], columns: vec![] };
     let mut data_root = generate_basic_data();
 
-    let result = imp_excel(&file, &mut data_root.translations, &data_root.projects[0], false);
+    let result = import_excel(&mut file, &mut data_root.translations, &data_root.projects[0], false);
 
     assert!(result.is_ok());
     let result = result.unwrap();
@@ -84,7 +84,7 @@ fn import_empty_excel_file() {
 
 #[test]
 fn import_ignore_unknown_excel_file() {
-    let file = ExcelFileMock {
+    let mut file = ExcelFileMock {
         rows: vec![
             vec!["key".to_string(), "en-US".to_string(), "de-DE".to_string()],
             vec!["new1".to_string(), "added1-en".to_string(), "added1-de".to_string()],
@@ -94,7 +94,7 @@ fn import_ignore_unknown_excel_file() {
     };
     let mut data_root = generate_basic_data();
 
-    let result = imp_excel(&file, &mut data_root.translations, &data_root.projects[1], true);
+    let result = import_excel(&mut file, &mut data_root.translations, &data_root.projects[1], true);
 
     assert!(result.is_ok());
     let result = result.unwrap();

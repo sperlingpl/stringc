@@ -27,7 +27,7 @@ impl Generator for TranslationsIOS {
                 .replace("\"", "\\\"");
 
             let out_string = format!("\"{}\" = \"{}\";\n", translation.key, out_value);
-            let result = file.write_all(out_string.as_ref());
+            file.write_all(out_string.as_ref())?;
         }
 
         file.flush()?;

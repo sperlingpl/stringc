@@ -10,6 +10,8 @@ use lib::json_data::{DataRoot, generate_template, get_projects, Project, save, T
 use lib::excel_writer::{ExcelTranslation, ExcelTranslations};
 use lib::ios_generator::{TranslationOut, TranslationsIOS};
 use lib::strings_generator::Generator;
+use lib::excel_file::ExcelFile;
+use lib::excel_reader::import_excel;
 
 
 const COMMAND_GENERATE_TEMPLATE: &str = "generate";
@@ -107,17 +109,31 @@ fn import_xlsx_command(matches: &ArgMatches) {
         .value_of(ARG_INPUT_FILE_NAME)
         .unwrap();
 
+    let project_name = matches.subcommand_matches(COMMAND_IMPORT_XLSX)
+        .unwrap()
+        .value_of(ARG_PROJECT_NAME)
+        .unwrap();
+
     let ignore_unknown = matches.subcommand_matches(COMMAND_IMPORT_XLSX)
         .unwrap()
         .is_present(ARG_IMPORT_IGNORE_UNKNOWN_KEYS);
 
     let mut projects_data = get_data(file_name);
+    let mut file = ExcelFile::new(xlsx_file_name)
+        .unwrap_or_else(|err| {
+            println!("error: {}", err);
+            process::exit(1)
+        });
 
-    // import_excel(xlsx_file_name, &mut projects_data, 1, ignore_unknown);
-    // if let Err(e) = save(file_name, &projects_data) {
-    //     println!("error: {}", e);
-    //     process::exit(1)
-    // };
+    let project = projects_data.projects.iter().find(|&p| {
+        p.name.eq(project_name)
+    }).expect("Invalid project name");
+
+    let result = import_excel(&mut file, &mut projects_data.translations, &project, ignore_unknown);
+    if let Err(e) = save(file_name, &projects_data) {
+        println!("error: {}", e);
+        process::exit(1)
+    };
 }
 
 fn export_xlsx_command(matches: &ArgMatches) {
@@ -246,6 +262,11 @@ fn get_arguments() -> ArgMatches {
                 .takes_value(false)
                 .about("File to import")
             )
+            .arg(Arg::new(ARG_PROJECT_NAME)
+                .required(true)
+                .takes_value(false)
+                .about("Project name")
+            )
             .arg(Arg::new(ARG_IMPORT_IGNORE_UNKNOWN_KEYS)
                 .required(false)
                 .takes_value(false)
@@ -325,6 +346,7 @@ fn get_data(file_name: &str) -> DataRoot {
             println!("Cannot open data file!\nerror: {}", err);
             process::exit(1)
         });
+
     projects_data
 }
 
@@ -335,5 +357,5 @@ fn load_data_file(name: &str) -> String {
             process::exit(1);
         });
 
-    return string_data;
+    string_data
 }

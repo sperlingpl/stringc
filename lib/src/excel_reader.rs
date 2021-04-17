@@ -2,11 +2,8 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 
-use calamine::{Reader, Xlsx};
-
 use crate::excel_file::EFile;
-use crate::json_data::{DataRoot, Translation, Project, DataRootTranslations};
-use std::panic::resume_unwind;
+use crate::json_data::{Translation, Project, DataRootTranslations};
 
 pub struct ImportResult {
     pub added: Vec<String>,
@@ -32,8 +29,8 @@ struct Lang {
 
 type Result<T> = std::result::Result<T, InvalidLanguageError>;
 
-pub fn imp_excel(file: &dyn EFile, data_root: &mut DataRootTranslations, project: &Project, ignore_unknown: bool)
-    -> Result<ImportResult> {
+pub fn import_excel(file: &mut dyn EFile, data_root: &mut DataRootTranslations, project: &Project, ignore_unknown: bool)
+                    -> Result<ImportResult> {
     let mut lang_list: Vec<Lang> = vec![];
     let mut result = ImportResult { added: vec![], updated: vec![], ignored: vec![] };
 
@@ -82,42 +79,6 @@ fn add_result(key: String, list: &mut Vec<String>) {
         list.push(key);
     }
 }
-//
-// pub fn import_excel(file: &str, data_root: &mut DataRoot, project_id: u16, ignore_unknown: bool) {
-//     let mut workbook: Xlsx<_> = calamine::open_workbook(file)
-//         .expect("Cannot open file");
-//
-//     let worksheet = workbook.worksheets()
-//         .first()
-//         .expect("Cannot read sheet")
-//         .clone();
-//
-//     let mut lang_list: Vec<String> = vec![];
-//
-//     for (idx, row) in worksheet.1.rows().into_iter().enumerate() {
-//         if 0.eq(&idx) {
-//             for column in 1..row.len() {
-//                 lang_list.push(row[column].to_string());
-//             }
-//             continue;
-//         }
-//
-//         let key = row[0].to_string();
-//         if key.is_empty() {
-//             continue;
-//         }
-//
-//         for (idx, lang) in lang_list.iter().enumerate() {
-//             let value = row[idx + 1].to_string();
-//
-//             if data_root.translations.contains_key(&key) {
-//                 update_key_value(data_root, project_id, &key, lang, &value);
-//             } else if !ignore_unknown {
-//                 add_new_key(data_root, project_id, key.to_string(), lang, value);
-//             } else {}
-//         }
-//     }
-// }
 
 fn update_key_value(data_root: &mut DataRootTranslations, project_id: u16, key: &String, lang: &String, value: &String) {
     let translation_data = data_root.get_mut(key)
